@@ -1,0 +1,35 @@
+Please use this version only for MSSQL 2012 (all editions) or MSSQL 2008R2 Enterprise.
+
+This version will installthe new auditing and all E.ON specific customisations. 
+Please ensure that 7-ZIP is also installed!
+
+If you encounter any problems or errors please report it to me.
+
+Marco.
+
+2014/11/12
+- new audits
+- check if customisations are already applied
+
+2015/07/20
+- check for "default" instance names
+- fixed DBA Job 'Cycle_Errorlogs'
+
+2015/08/11
+- fixed service start-stop syntax to work with default name
+
+2015/08/25
+- fixed installation report
+-	Is FlashCopyManager installed
+-	TDP version 7.1.x
+-	Run test backup of master db
+-	AgentStartMode
+-	DBSPI installed
+-	Audits installed
+
+2015/08/26
+- change dbspi check (dbspicam -dpv)
+- new check for audit job
+
+2015/09/24
+- - fixed DBA Job 'DC19_out'

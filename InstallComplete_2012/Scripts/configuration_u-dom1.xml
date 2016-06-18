@@ -1,0 +1,43 @@
+﻿<?xml version="1.0" ?>
+<Configuration>
+	<Settings>
+		<FMOEnabled>false</FMOEnabled>
+		<SPEnabled>false</SPEnabled>
+		<CUEnabled>false</CUEnabled>	
+		<AgentEnabled>false</AgentEnabled>
+		<DefaultVersion>MSSQL 2012</DefaultVersion>
+		<DefaultEdition>Standard</DefaultEdition>
+		<DefaultCollation>SQL_Latin1_General_CP1_CI_AS</DefaultCollation>
+		<BinaryDrive>D:</BinaryDrive>
+		<InstallFolder>Install\UnattendedInstallation</InstallFolder>
+	</Settings>
+	<Variables>
+		<Adminaccount>U-DOM1\CSS_CC11SQLFull_DS</Adminaccount>
+		<Adminaccount>U-DOM1\P12795</Adminaccount>
+		<Adminaccount>U-DOM1\CSS_CC11UC4_DS</Adminaccount>
+	</Variables>
+	<Addins>
+		<psscript>
+			<scriptname>getfiles.ps1</scriptname>
+			<param>
+				<name>serverinstance</name>
+				<value>SM03893\S042</value>
+			</param>
+			<param>			
+				<name>erroraction</name>
+				<value>silentlycontinue</value>
+			</param>
+		</psscript>
+		<psfunction>
+		<functionname></functionname>
+			<param>
+				<name></name>
+				<value></value>
+			</param>
+		</psfunction>
+		<sql>
+		<scriptname></scriptname>
+		    <var></var>
+		</sql>
+	</Addins>
+</Configuration>

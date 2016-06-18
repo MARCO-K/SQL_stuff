@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" ?>
+<Configuration>
+	<Settings>
+		<FMOEnabled>false</FMOEnabled>
+		<SPEnabled>true</SPEnabled>
+		<CUEnabled>false</CUEnabled>	
+		<AgentEnabled>false</AgentEnabled>
+		<DefaultVersion>MSSQL 2008 R2</DefaultVersion>
+		<DefaultEdition>Standard</DefaultEdition>
+		<DefaultCollation>SQL_Latin1_General_CP1_CI_AS</DefaultCollation>
+		<InstallDrive>D:</InstallDrive>
+		<InstallFolder>Install\UnattendedInstallation</InstallFolder>
+	</Settings>
+	<Variables>
+		<Adminaccount>DOM1\CSS_CC11SQLFull_DS</Adminaccount>
+		<Adminaccount>DOM1\P12795</Adminaccount>
+		<Adminaccount>DOM1\CSS_CC11UC4_DS</Adminaccount>
+	</Variables>
+</Configuration>
