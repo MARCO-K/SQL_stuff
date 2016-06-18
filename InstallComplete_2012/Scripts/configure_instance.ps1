@@ -95,7 +95,7 @@ function main()
   Disable-Logins -logins 'sa','\everyone'
   #Add-Job_cycleErrorlog
   #Add-Jpb_dc19
-  Add-Datafiles -dbname tempdb -size 102400 -growth 102400 -count 4
+  Add-Datafiles -dbname tempdb -size 102400 -growth 102400 -count (Get-CPUs $server.netname)
   Set-Database -dbname master -recovery Full
   Set-Database -dbname msdb -recovery Full
   Set-Agent -IdleCpuDuration 600 -IdleCpuPercentage 10 -IsCpuPollingEnabled $true
