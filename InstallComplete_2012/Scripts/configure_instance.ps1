@@ -4,6 +4,7 @@
     Version 
     - 1.0 initial version
     - 1.1 bug fixing, added more parameter to functions
+	- 1.2 fixed core calculation for tempdb file count
 
     .SYNOPSIS
 
@@ -40,13 +41,13 @@
 
     .EXAMPLE
 
-     .\change_settings.ps1 -port 1433 -ServerInstance DEFREON0830\S60039 -classification white –Verbose
+    .\configure_instance.ps1 -port 1433 -ServerInstance DEFREON0830\S60039 -classification white –Verbose
 #>
 #requires -Version 3
 
 param(
   [Parameter(Mandatory=$true,ValueFromPipeline=$true)][ValidateRange(1433,1450)][int]$port,
-  [Parameter(Mandatory=$true,ValueFromPipeline=$true)][string]$ServerInstance=$(Throw 'Parameter missing: -ServerInstance Server\Instanz'),
+  [Parameter(Mandatory=$true,ValueFromPipeline=$true)][ValidateNotNullOrEmpty()][string]$ServerInstance,
   [Parameter(Mandatory=$true,ValueFromPipeline=$true)][ValidateSet('black','grey','white')][String]$classification,
   [string]$BackupUser='DOM1\P12795'
 )
@@ -62,8 +63,10 @@ function main()
   #create initial SMO object
   $server = new-object ('Microsoft.SqlServer.Management.Smo.Server') $ServerInstance
 
-    #set initial variales
+  #set initial variales
   $backup_db='mast','model','msdb'
+  get-cpus -server $server.NetName
+  $cores = $properties.cores
 
   if (Test-Path ($Server.InstallDataDirectory).remove(($Server.InstallDataDirectory).indexOf('Microsoft SQL Server')+20))
     {$tools=($Server.InstallDataDirectory).remove(($Server.InstallDataDirectory).indexOf('Microsoft SQL Server')+20)+'\tools'}
@@ -89,26 +92,25 @@ function main()
 
   Test-SQLServer -ServerInstance $ServerInstance
   Set-logfiles -NumberOfLogFiles 30
-  Add-Logins_G -logins $shore
+  Add-Logins_G -logins $shore,'DOM1\CSS_CC11SQLFull_DS'
   Add-Logins_U -logins $BackupUser
   Drop-Logins -logins 'BUILTIN\Administrators'
   Disable-Logins -logins 'sa','\everyone'
   #Add-Job_cycleErrorlog
   #Add-Jpb_dc19
-  Add-Datafiles -dbname tempdb -size 102400 -growth 102400 -count (Get-CPUs $server.netname)
+  Add-Datafiles -dbname tempdb -size 102400 -growth 102400 -count $cores
   Set-Database -dbname master -recovery Full
   Set-Database -dbname msdb -recovery Full
   Set-Agent -IdleCpuDuration 600 -IdleCpuPercentage 10 -IsCpuPollingEnabled $true
   Set-Port -port $port
   Set-ServiceStart -services 'SQL','agent','browser' -instance $server.InstanceName
   Copy-Databases -backup_db $backup_db
-  Stop-SQLService -services 'SQL','agent','browser' -instance $server.InstanceName -verbose
-  Start-SQLService -services 'SQL','agent','browser' -instance $server.InstanceName -verbose
+  Stop-SQLService -services 'SQL','agent','browser' -instance $server.InstanceName
+  Start-SQLService -services 'SQL','agent','browser' -instance $server.InstanceName
 }
 
 function Test-SQLServer { param([string]$ServerInstance)
   TRY {
-    $ServerInstance = 'DEFREON0830\S60039'
     $sqlCon = New-Object Data.SqlClient.SqlConnection
     $sqlCon.ConnectionString = "Data Source=$ServerInstance;Integrated Security=True"
     $sqlCon.open() 
@@ -185,43 +187,48 @@ function Add-Logins_U { param( [string[]]$logins )
 function Drop-Logins { param( [string[]]$logins )
   try {
     $names = ($server.Logins | Where-Object {$_.IsSystemObject -eq $false -and $_.Name -notlike 'NT *'  -and $_.Name -notlike '##*##'}).Name.Trim()
+    foreach($login in $logins){
+    if($login -in $names){
     #drop database users
     foreach($database in $server.Databases) {
-        foreach($login in $logins) {
-            if($database.Users.Contains($login))
+        if($database.Users.Contains($login))
             { $database.Users[$login].Drop() }
-        }
     }
     #drop server logins
-    foreach($login in $logins) {
-        if ($login -in $names) 
-        { $server.Logins[$login].Drop() }
-    }
+        if($server.Logins.Contains($login))
+            { $server.Logins[$login].Drop() }
+
     Write-verbose "Permissions for $logins revoked"
+    }
+    else { Write-verbose "$login does not exist" }
+    }
     }
   catch { Write-host -ForegroundColor Red "Permissions for $logins not revoked" }
 }
 
 function Disable-Logins  { param( [string[]]$logins )
   try {
-    #drop server logins
-    foreach($login in $logins)
-    {
+    $names = ($server.Logins | Where-Object {$_.IsSystemObject -eq $false -and $_.Name -notlike 'NT *'  -and $_.Name -notlike '##*##'}).Name.Trim()
+    
+    foreach($login in $logins) {
+    if($login -in $names){
+    #disable server logins
         if ($server.Logins.Contains($login)) 
         { $server.Logins[$login].Disable() }
     }
-    Write-verbose "logins $logins disabled"
+    Write-verbose "Login $login disabled"
     }
-  catch { Write-host -ForegroundColor Red "Login $logins not disabled" }
+    }
+  catch { Write-host -ForegroundColor Red "Login $login not disabled" }
 }
 
 function Add-Datafiles { param( [string]$dbname, [int]$size, [int]$growth, [int]$count )
   try {   
     $db = $server.Databases[$dbname]
-    $datapath=$tempdb.PrimaryFilePath
+    $datapath=$db.PrimaryFilePath
     $fg = $db.FileGroups['PRIMARY']
     if($fg.Files.Count -le $count) { 
-      if ($count -gt 8) {$count=4}
+      if ($count -gt 8) {$count=4} 
       for ($i=1;$i -le $count-1;$i+=1)
       {
         $filename = $dbname+'_data'+$i
@@ -234,6 +241,7 @@ function Add-Datafiles { param( [string]$dbname, [int]$size, [int]$growth, [int]
         $fg.Alter()
         $db.Alter()
         Write-Verbose "Datafile $filename created"
+        Clear-Variable fg
       }
      }
      else {Write-Verbose "Datafile count for $dbname is alread $count"}
@@ -293,12 +301,12 @@ function Copy-Databases { param( [string[]]$backup_db )
         Stop-SQLService -service sql -instance $server.InstanceName
       If ($Server.MasterDBPath -eq $Server.MasterDBLogPath)
       {foreach ($db in $backup_db)
-        {& $robocopy $Server.MasterDBPath $($Server.BackupDirectory +'\Offline_Backup_' + $(Get-Date -uFormat %d%m%Y)) "$db*.?df" /R:2 /njh /njs /ndl /nc /ns}
+        {& $robocopy $Server.MasterDBPath $($Server.BackupDirectory +'\Offline_Backup_' + $(Get-Date -uFormat %d%m%Y)) "$db*.?df" /R:2 /njh /njs /ndl /nfl /np /nc /ns}
       }
       else
       {foreach ($db in $backup_db)
-        {& $robocopy $Server.MasterDBPath $($Server.BackupDirectory +'\Offline_Backup_' + $(Get-Date -uFormat %d%m%Y)) "$db*.?df" /R:2 /njh /njs /ndl /nc /ns
-        & $robocopy $Server.MasterDBLogPath $($Server.BackupDirectory +'\Offline_Backup_' + $(Get-Date -uFormat %d%m%Y)) "$db*.?df" /R:2 /njh /njs /ndl /nc /ns}
+        {& $robocopy $Server.MasterDBPath $($Server.BackupDirectory +'\Offline_Backup_' + $(Get-Date -uFormat %d%m%Y)) "$db*.?df" /R:2 /njh /njs /ndl /nfl /np /nc /ns
+        & $robocopy $Server.MasterDBLogPath $($Server.BackupDirectory +'\Offline_Backup_' + $(Get-Date -uFormat %d%m%Y)) "$db*.?df" /R:2 /njh /njs /ndl /nfl /np /nc /ns}
       }
         write-verbose 'System databases copied'
         Start-SQLService -service sql -instance $server.InstanceName
@@ -415,7 +423,12 @@ function Get-CPUs {
             {$sockets++; $cores = $cores + $proc.numberofcores }
 
       }
-      $cores, $sockets
+    #prepare output
+	$properties = @{
+    cores = $cores
+    sockets = $sockets
+    cpus = $($processors | Measure-Object).count
+  }
 }
 
 $mypath = Split-Path -Parent $MyInvocation.MyCommand.Definition
